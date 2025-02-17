@@ -7,11 +7,6 @@ import "./App.css";
 import ChatInput from "./components/ChatInput";
 import ChatMessages from "./components/ChatMessage";
 
-/* Updated parseMessage to mark an incomplete think segment */
-
-// Updated collapsible component for think segments (for complete segments)
-
-
 
 function App() {
   // Chat state
@@ -19,12 +14,19 @@ function App() {
     { sender: "bot", text: "Hello! How can I help you?" },
   ]);
   const [input, setInput] = useState("");
+  
+  const models = {
+    "Qwen 2.5": "qwen2.5",
+    "DeepSeek R1": "deepseek-r1:7b",
+    "Llama 3": "llama3",
+    "Gemma": "gemma2"
+  };
+  const [selectedModel, setSelectedModel] = useState(models["DeepSeek R1"]);
+  const [error, setError] = useState(null);
 
-  // Submit handler using ollama.generate
   const handleSubmit = async (e) => {
     e.preventDefault();
     const userMessage = { role: "user", content: input };
-    // Define system prompt instructing the model for its name
     const systemMessage = {
       role: "system",
       content: `
@@ -34,18 +36,16 @@ You are SquidGPT, a helpful and informative AI assistant.  You are designed to p
     setMessages((prev) => [...prev, { sender: "user", text: input }]);
     setInput("");
 
-    // Add a bot message placeholder
     let botMessage = { sender: "bot", text: "" };
     setMessages((prev) => [...prev, botMessage]);
 
     try {
       const response = await ollama.generate({
-        model: "deepseek-r1:7b",
+        model: selectedModel,
         prompt: userMessage.content,
         system: systemMessage.content,
         stream: true,
       });
-      // Process the streaming generate response with safety check
       for await (const part of response) {
         botMessage.text += part.response || "";
         setMessages((prev) => {
@@ -54,10 +54,13 @@ You are SquidGPT, a helpful and informative AI assistant.  You are designed to p
           return updated;
         });
       }
-      console.log(response)
+      console.log(response);
+      setError(null);
     } catch (error) {
       console.error(error);
-      // Optionally handle error in UI.
+      if (error.message) {
+        setError(error.message);
+      }
     }
   };
 
@@ -67,13 +70,25 @@ You are SquidGPT, a helpful and informative AI assistant.  You are designed to p
       console.log(response.data);
     } catch (error) {
       console.error(error);
-      // Optionally handle error in UI.
     }
   };
 
   return (
     <div className="App">
       <h1>SquidGPT 🦑</h1>
+      {error && <div className="error">{error}</div>}
+      <div className="model-switcher">
+        <label htmlFor="model-select">Select model: </label>
+        <select
+          id="model-select"
+          value={selectedModel}
+          onChange={(e) => setSelectedModel(e.target.value)}
+        >
+          {Object.entries(models).map(([name, code]) => (
+            <option key={code} value={code}>{name}</option>
+          ))}
+        </select>
+      </div>
       <div className="chat">
         <ChatMessages messages={messages} />
         <ChatInput input={input} setInput={setInput} handleSubmit={handleSubmit} />
